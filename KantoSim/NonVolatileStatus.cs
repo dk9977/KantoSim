@@ -19,6 +19,8 @@ namespace KantoSim
             _extraEffect = extraEffect;
         }
 
+        public byte Duration { get => _duration; }
+
         private static bool BurnEffect(Battler battler)
         {
             // divide Attack by 2

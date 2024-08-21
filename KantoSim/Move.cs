@@ -7,42 +7,39 @@ namespace KantoSim
 {
     public abstract class Move
     {
-        protected static Random rng;
-
-        private string _name;
-        private Type _type;
-        private bool _damages;
-        private double _accuracy;
-        private byte _maxPp;
-        private byte _pp;
-        private sbyte _priority;
+        public string Name { get; }
+        public Type Type { get; }
+        public bool Damages { get; }
+        public double Accuracy { get; }
+        public byte MaxPp { get; }
+        public byte Pp { get; }
+        public sbyte Priority { get; }
+        public bool Enabled { get; set; }
 
         protected Move(string name, Type type, bool damages, double accuracy, byte pp, sbyte priority)
         {
-            _name = name;
-            _type = type;
-            _damages = damages;
-            _accuracy = accuracy;
-            _pp = pp;
-            _priority = priority;
+            Name = name;
+            Type = type;
+            Damages = damages;
+            Accuracy = accuracy;
+            Pp = pp;
+            Priority = priority;
+            Enabled = true;
         }
-
-        public string Name { get => _name; }
-        public Type Type { get => _type; }
-        public bool Damages { get => _damages; }
-        public double Accuracy { get => _accuracy; }
-        public byte MaxPp { get => _maxPp; }
-        public byte Pp { get => _pp; }
-        public sbyte Priority { get => _priority; }
 
         public bool CanUse()
         {
-            return _pp > 0;
+            return Pp > 0 && Enabled;
         }
 
-        public virtual (bool OnUser, object Specifier, (int Scale, double Chance)[]) Secondary(ushort lastDamage, ushort userMaxHp)
+        public virtual MoveEffect Primary(Battler user, Battler target)
         {
-            return (false, null, new (int, double)[0]);
+            return MoveEffect.None;
+        }
+
+        public virtual MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
+        {
+            return MoveEffect.None;
         }
 
         public readonly Move[] movedex = {};
@@ -53,7 +50,7 @@ namespace KantoSim
         public DamagingMove(string name, Type type, double accuracy, byte pp, sbyte priority) : base(name, type, true, accuracy, pp, priority)
         { }
 
-        public abstract (ushort Damage, double Chance)[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes);
+        public abstract MoveEffectPossibility[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes);
     }
 
     public abstract class RegularDamagingMove : DamagingMove
@@ -68,11 +65,11 @@ namespace KantoSim
             Power = power;
         }
 
-        public override (ushort Damage, double Chance)[] GetDamageArray(byte userLevel, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
+        public override MoveEffectPossibility[] GetDamageArray(byte userLevel, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
         {
             foreach (Type t in targetTypes)
                 if (Type.EffectivenessAgainst(t) == Type.Effectiveness.Ineffective)
-                    return new (ushort, double)[] { (0, 1.0) };
+                    return MoveEffectPossibility.Single(0);
             d /= DefenseDivisor;
             if (a > 255 || d > 255)
             {
@@ -114,7 +111,7 @@ namespace KantoSim
             double critElemChance = critChance / critRandomArray.Length;
             return baseRandomArray.Select(d => (d, baseElemChance))
                 .Concat(critRandomArray.Select(d => (d, critElemChance)))
-                .GroupBy(t => t.d, (d, a) => (d, a.Sum(t => t.Item2)))
+                .GroupBy(t => t.d, (d, a) => new MoveEffectPossibility(d, a.Sum(t => t.Item2)))
                 .ToArray();
         }
 
@@ -131,9 +128,9 @@ namespace KantoSim
         public AbsorbingMove(string name, Type type, byte power, double accuracy, byte pp, sbyte priority) : base(name, type, power, accuracy, pp, priority)
         { }
 
-        public override (bool OnUser, object Specifier, (int Scale, double Chance)[]) Secondary(ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
         {
-            return (true, null, new (int, double)[] { (lastDamage / -2, 1.0) });
+            return MoveEffect.Single(true, null, lastDamage / -2);
         }
     }
 
@@ -171,9 +168,9 @@ namespace KantoSim
             Chance = chance;
         }
 
-        public override (bool OnUser, object Specifier, (int Scale, double Chance)[]) Secondary(ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
         {
-            return (false, Affected, new (int, double)[] { (Stages, Chance), (0, 1 - Chance) });
+            return MoveEffect.SingleChance(false, Affected, Stages, Chance);
         }
     }
 
@@ -202,9 +199,9 @@ namespace KantoSim
             Stages = stages;
         }
 
-        public override (bool OnUser, object Specifier, (int Scale, double Chance)[]) Secondary(ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
         {
-            return (OnUser, Affected, new (int, double)[] { (Stages, 1.0) });
+            return MoveEffect.Single(OnUser, Affected, Stages);
         }
     }
 
@@ -237,9 +234,14 @@ namespace KantoSim
         public MultipleDamagingMove(string name, Type type, byte power, double accuracy, byte pp, sbyte priority) : base(name, type, power, accuracy, pp, priority)
         { }
 
-        public override (bool OnUser, object Specifier, (int Scale, double Chance)[]) Secondary(ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
         {
-            return (false, null, new (int, double)[] { (lastDamage, 0.125), (lastDamage * 2, 0.375), (lastDamage * 3, 0.375), (lastDamage * 4, 0.125) });
+            return new MoveEffect(false, null, new MoveEffectPossibility[] {
+                new MoveEffectPossibility(lastDamage, 0.125),
+                new MoveEffectPossibility(lastDamage * 2, 0.375),
+                new MoveEffectPossibility(lastDamage * 3, 0.375),
+                new MoveEffectPossibility(lastDamage * 4, 0.125)
+            });
         }
     }
 
@@ -275,9 +277,9 @@ namespace KantoSim
             Chance = chance;
         }
 
-        public override (bool OnUser, object Specifier, (int Scale, double Chance)[]) Secondary(ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
         {
-            return (false, Affected, new (int, double)[] { (1, Chance), (0, 1 - Chance) });
+            return MoveEffect.SingleChance(false, Affected, 1, Chance);
         }
     }
 
@@ -301,9 +303,9 @@ namespace KantoSim
             Chance = chance;
         }
 
-        public override (bool OnUser, object Specifier, (int Scale, double Chance)[]) Secondary(ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
         {
-            return (false, Affected, new (int, double)[] { (1, Chance), (0, 1 - Chance) });
+            return MoveEffect.SingleChance(false, Affected, 1, Chance);
         }
     }
 
@@ -330,9 +332,9 @@ namespace KantoSim
         public DoubleDamagingMove(string name, Type type, byte power, double accuracy, byte pp, sbyte priority) : base(name, type, power, accuracy, pp, priority)
         { }
 
-        public override (bool OnUser, object Specifier, (int Scale, double Chance)[]) Secondary(ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
         {
-            return (false, null, new (int, double)[] { (lastDamage, 1) });
+            return MoveEffect.Single(false, null, lastDamage);
         }
     }
 
@@ -374,9 +376,9 @@ namespace KantoSim
             Affected = affected;
         }
 
-        public override (bool OnUser, object Specifier, (int Scale, double Chance)[]) Secondary(ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
         {
-            return (OnUser, Affected, new (int, double)[] { (1, 1.0) });
+            return MoveEffect.Single(OnUser, Affected, 1);
         }
     }
 
@@ -403,14 +405,14 @@ namespace KantoSim
         public Counter() : base("Counter", Type.Fighting, 1.0, 20, 0)
         { }
 
-        public override (ushort Damage, double Chance)[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
+        public override MoveEffectPossibility[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
         {
-            return new (ushort, double)[0];
+            return new MoveEffectPossibility[0];
         }
 
-        public override (bool OnUser, object Specifier, (int Scale, double Chance)[]) Secondary(ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
         {
-            return (false, null, new (int, double)[] { (lastDamage * 2, 1.0) });
+            return MoveEffect.Single(false, null, lastDamage * 2);
         }
     }
 
@@ -483,9 +485,9 @@ namespace KantoSim
             RecoilReciprocal = recoilReciprocal;
         }
 
-        public override (bool OnUser, object Specifier, (int Scale, double Chance)[]) Secondary(ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
         {
-            return (true, null, new (int, double)[] { (lastDamage / RecoilReciprocal, 1.0) });
+            return MoveEffect.Single(true, null, lastDamage / RecoilReciprocal);
         }
     }
 
@@ -500,9 +502,9 @@ namespace KantoSim
         public DragonRage() : base("Dragon Rage", Type.Dragon, 1.0, 10, 0)
         { }
 
-        public override (ushort Damage, double Chance)[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
+        public override MoveEffectPossibility[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
         {
-            return new (ushort, double)[] { (40, 1.0) };
+            return MoveEffectPossibility.Single(40);
         }
     }
 
@@ -545,9 +547,9 @@ namespace KantoSim
         public KamikazeDamagingMove(string name, Type type, byte power, double accuracy, byte pp, sbyte priority) : base(name, type, power, accuracy, pp, priority)
         { }
 
-        public override (bool OnUser, object Specifier, (int Scale, double Chance)[]) Secondary(ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
         {
-            return (true, null, new (int, double)[] { (int.MaxValue, 1.0) });
+            return MoveEffect.Single(true, null, userMaxHp);
         }
     }
 
@@ -579,9 +581,9 @@ namespace KantoSim
 
         // fails if user is slower than target
 
-        public override (ushort Damage, double Chance)[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
+        public override MoveEffectPossibility[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
         {
-            return new (ushort, double)[] { (ushort.MaxValue, 1.0) };
+            return MoveEffectPossibility.Single(ushort.MaxValue);
         }
     }
 
@@ -628,26 +630,24 @@ namespace KantoSim
     {
         public bool OnUser { get; }
         public NonVolatileStatus Affected { get; }
-        public byte MaxDuration { get; }
 
-        public NonVolatileStatusStatusMove(string name, Type type, double accuracy, byte pp, sbyte priority, bool onUser, NonVolatileStatus affected, byte maxDuration) : base(name, type, accuracy, pp, priority)
+        public NonVolatileStatusStatusMove(string name, Type type, double accuracy, byte pp, sbyte priority, bool onUser, NonVolatileStatus affected) : base(name, type, accuracy, pp, priority)
         {
             OnUser = onUser;
             Affected = affected;
-            MaxDuration = maxDuration;
         }
 
-        public override (bool OnUser, object Specifier, (int Scale, double Chance)[]) Secondary(ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
         {
-            if (MaxDuration == 0)
-                return (OnUser, Affected, new (int, double)[] { (0, 1.0) });
-            return (OnUser, Affected, Enumerable.Range(1, MaxDuration).Select(r => (r, 1.0 / (MaxDuration + 1))).ToArray());
+            if (Affected.Duration == 0)
+                return MoveEffect.Single(OnUser, Affected, 1);
+            return new MoveEffect(OnUser, Affected, Enumerable.Range(1, Affected.Duration).Select(r => new MoveEffectPossibility(r, 1.0 / Affected.Duration)).ToArray());
         }
     }
 
     public sealed class Glare : NonVolatileStatusStatusMove
     {
-        public Glare() : base("Glare", Type.Normal, 0.75, 30, 0, false, NonVolatileStatus.Paralysis, 0)
+        public Glare() : base("Glare", Type.Normal, 0.75, 30, 0, false, NonVolatileStatus.Paralysis)
         { }
     }
 
@@ -695,10 +695,10 @@ namespace KantoSim
         public JumpDamagingMove(string name, byte power, double accuracy, byte pp) : base(name, Type.Fighting, power, accuracy, pp, 0)
         { }
 
-        public override (bool OnUser, object Specifier, (int Scale, double Chance)[]) Secondary(ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
         {
             // triggers on a miss
-            return (true, null, new (int, double)[] { (1, 1.0) });
+            return MoveEffect.Single(true, null, 1);
         }
     }
 
@@ -726,14 +726,16 @@ namespace KantoSim
         { }
     }
 
-    public abstract class RechargeDamagingMove : RegularDamagingMove
+    public abstract class RechargeDamagingMove : RegularDamagingMove, IAffectsVolatileStatus
     {
+        public Battler.VolatileStatus Affected => Battler.VolatileStatus.Recharging;
+
         public RechargeDamagingMove(string name, Type type, byte power, double accuracy, byte pp) : base(name, type, power, accuracy, pp, 0)
         { }
 
-        public override (bool OnUser, object Specifier, (int Scale, double Chance)[]) Secondary(ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
         {
-            return (true, Battler.VolatileStatus.Recharging, new (int, double)[] { (1, 1.0) });
+            return MoveEffect.Single(true, Affected, 1);
         }
     }
 
@@ -751,7 +753,7 @@ namespace KantoSim
 
     public sealed class Hypnosis : NonVolatileStatusStatusMove
     {
-        public Hypnosis() : base("Hypnosis", Type.Psychic, 0.6, 20, 0, false, NonVolatileStatus.Sleep, 7)
+        public Hypnosis() : base("Hypnosis", Type.Psychic, 0.6, 20, 0, false, NonVolatileStatus.Sleep)
         { }
     }
 
@@ -814,7 +816,7 @@ namespace KantoSim
 
     public sealed class LovelyKiss : NonVolatileStatusStatusMove
     {
-        public LovelyKiss() : base("Lovely Kiss", Type.Normal, 0.75, 10, 0, false, NonVolatileStatus.Sleep, 7)
+        public LovelyKiss() : base("Lovely Kiss", Type.Normal, 0.75, 10, 0, false, NonVolatileStatus.Sleep)
         { }
     }
 
@@ -871,9 +873,9 @@ namespace KantoSim
         public NightShade() : base("Night Shade", Type.Ghost, 1.0, 15, 0)
         { }
 
-        public override (ushort Damage, double Chance)[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
+        public override MoveEffectPossibility[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
         {
-            return new (ushort, double)[] { (level, 1.0) };
+            return MoveEffectPossibility.Single(level);
         }
     }
 
@@ -902,13 +904,13 @@ namespace KantoSim
 
     public sealed class PoisonGas : NonVolatileStatusStatusMove
     {
-        public PoisonGas() : base("Poison Gas", Type.Poison, 0.55, 40, 0, false, NonVolatileStatus.Poison, 0)
+        public PoisonGas() : base("Poison Gas", Type.Poison, 0.55, 40, 0, false, NonVolatileStatus.Poison)
         { }
     }
 
     public sealed class PoisonPowder : NonVolatileStatusStatusMove
     {
-        public PoisonPowder() : base("Poison Powder", Type.Poison, 0.75, 35, 0, false, NonVolatileStatus.Poison, 0)
+        public PoisonPowder() : base("Poison Powder", Type.Poison, 0.75, 35, 0, false, NonVolatileStatus.Poison)
         { }
     }
 
@@ -941,10 +943,12 @@ namespace KantoSim
         public Psywave() : base("Psywave", Type.Psychic, 0.8, 15, 0)
         { }
 
-        public override (ushort Damage, double Chance)[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
+        public override MoveEffectPossibility[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
         {
+            if (level <= 1)
+                throw new ArgumentOutOfRangeException("Pokemon of this level cannot use Psywave!", "level");
             int count = level * 3 / 2 - 1;
-            return Enumerable.Range(1, count).Select(d => ((ushort)d, 1.0 / count)).ToArray();
+            return Enumerable.Range(1, count).Select(d => new MoveEffectPossibility((ushort)d, 1.0 / count)).ToArray();
         }
     }
 
@@ -971,9 +975,9 @@ namespace KantoSim
         public HalfHealStatusMove(string name, byte pp) : base(name, Type.Normal, 0.0, pp, 0)
         { }
 
-        public override (bool OnUser, object Specifier, (int Scale, double Chance)[]) Secondary(ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
         {
-            return (true, null, new (int, double)[] { (userMaxHp / -2, 1.0) });
+            return MoveEffect.Single(true, null, userMaxHp / -2);
         }
     }
 
@@ -1036,9 +1040,9 @@ namespace KantoSim
         public SeismicToss() : base("Seismic Toss", Type.Fighting, 1.0, 20, 0)
         { }
 
-        public override (ushort Damage, double Chance)[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
+        public override MoveEffectPossibility[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
         {
-            return new (ushort, double)[] { (level, 1.0) };
+            return MoveEffectPossibility.Single(level);
         }
     }
 
@@ -1056,7 +1060,7 @@ namespace KantoSim
 
     public sealed class Sing : NonVolatileStatusStatusMove
     {
-        public Sing() : base("Sing", Type.Normal, 0.55, 15, 0, false, NonVolatileStatus.Sleep, 7)
+        public Sing() : base("Sing", Type.Normal, 0.55, 15, 0, false, NonVolatileStatus.Sleep)
         { }
     }
 
@@ -1080,7 +1084,7 @@ namespace KantoSim
 
     public sealed class SleepPowder : NonVolatileStatusStatusMove
     {
-        public SleepPowder() : base("Sleep Powder", Type.Grass, 0.75, 15, 0, false, NonVolatileStatus.Sleep, 7)
+        public SleepPowder() : base("Sleep Powder", Type.Grass, 0.75, 15, 0, false, NonVolatileStatus.Sleep)
         { }
     }
 
@@ -1116,9 +1120,9 @@ namespace KantoSim
         public SonicBoom() : base("Sonic Boom", Type.Normal, 0.9, 20, 0)
         { }
 
-        public override (ushort Damage, double Chance)[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
+        public override MoveEffectPossibility[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
         {
-            return new (ushort, double)[] { (20, 1.0) };
+            return MoveEffectPossibility.Single(20);
         }
     }
 
@@ -1136,7 +1140,7 @@ namespace KantoSim
 
     public sealed class Spore : NonVolatileStatusStatusMove
     {
-        public Spore() : base("Spore", Type.Grass, 1.0, 15, 0, false, NonVolatileStatus.Sleep, 7)
+        public Spore() : base("Spore", Type.Grass, 1.0, 15, 0, false, NonVolatileStatus.Sleep)
         { }
     }
 
@@ -1166,7 +1170,7 @@ namespace KantoSim
 
     public sealed class StunSpore : NonVolatileStatusStatusMove
     {
-        public StunSpore() : base("Stun Spore", Type.Grass, 0.75, 30, 0, false, NonVolatileStatus.Paralysis, 0)
+        public StunSpore() : base("Stun Spore", Type.Grass, 0.75, 30, 0, false, NonVolatileStatus.Paralysis)
         { }
     }
 
@@ -1197,15 +1201,10 @@ namespace KantoSim
         { }
     }
 
-    public sealed class Swift : DamagingMove
+    public sealed class Swift : RegularDamagingMove
     {
-        public Swift() : base("Swift", Type.Normal, 0.0, 20, 0)
+        public Swift() : base("Swift", Type.Normal, 60, 0.0, 20, 0)
         { }
-
-        public override (ushort Damage, double Chance)[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
-        {
-            return new (ushort, double)[] { (60, 1.0) };
-        }
     }
 
     public sealed class SwordsDance : StatStatusMove
@@ -1261,7 +1260,7 @@ namespace KantoSim
 
     public sealed class ThunderWave : NonVolatileStatusStatusMove
     {
-        public ThunderWave() : base("Thunder Wave", Type.Electric, 1.0, 20, 0, false, NonVolatileStatus.Paralysis, 0)
+        public ThunderWave() : base("Thunder Wave", Type.Electric, 1.0, 20, 0, false, NonVolatileStatus.Paralysis)
         { }
     }
 
