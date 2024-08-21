@@ -270,14 +270,15 @@ namespace KantoSim
         public MultipleDamagingMove(string name, Type type, byte power, double accuracy, byte pp, sbyte priority) : base(name, type, power, accuracy, pp, priority)
         { }
 
-        public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
+        public override MoveEffectPossibility[] GetDamageArray(byte userLevel, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
         {
-            return new MoveEffect(false, new MoveEffectPossibility[] {
-                new MoveEffectPossibility(1, lastDamage, 0.375),
-                new MoveEffectPossibility(2, lastDamage, 0.375),
-                new MoveEffectPossibility(3, lastDamage, 0.125),
-                new MoveEffectPossibility(4, lastDamage, 0.125)
-            });
+            MoveEffectPossibility[] singleHit = base.GetDamageArray(userLevel, a, d, ba, bd, bs, fe, userTypes, targetTypes);
+            return singleHit.SelectMany(p => new MoveEffectPossibility[] {
+                new MoveEffectPossibility(2, p.Scale, p.Chance * 0.375),
+                new MoveEffectPossibility(3, p.Scale, p.Chance * 0.375),
+                new MoveEffectPossibility(4, p.Scale, p.Chance * 0.125),
+                new MoveEffectPossibility(5, p.Scale, p.Chance * 0.125)
+            }).ToArray();
         }
     }
 
@@ -368,9 +369,10 @@ namespace KantoSim
         public DoubleDamagingMove(string name, Type type, byte power, double accuracy, byte pp, sbyte priority) : base(name, type, power, accuracy, pp, priority)
         { }
 
-        public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
+        public override MoveEffectPossibility[] GetDamageArray(byte userLevel, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
         {
-            return MoveEffect.Single(false, null, lastDamage);
+            MoveEffectPossibility[] singleHit = base.GetDamageArray(userLevel, a, d, ba, bd, bs, fe, userTypes, targetTypes);
+            return singleHit.Select(p => new MoveEffectPossibility(2, p.Scale, p.Chance)).ToArray();
         }
     }
 
@@ -1318,12 +1320,19 @@ namespace KantoSim
         { }
     }
 
-    public sealed class Twineedle : DoubleDamagingMove
+    public sealed class Twineedle : DoubleDamagingMove, IAffectsNonVolatileStatus, ISecondaryChance
     {
         public Twineedle() : base("Twineedle", Type.Bug, 25, 1.0, 20, 0)
         { }
 
-        // also 20% chance to poison on second hit
+        public NonVolatileStatus Affected => NonVolatileStatus.Poison;
+
+        public double Chance => 0.2;
+
+        public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
+        {
+            return MoveEffect.SingleChance(false, Affected, 1, Chance);
+        }
     }
 
     public sealed class ViceGrip : RegularDamagingMove
