@@ -31,11 +31,13 @@ namespace KantoSim
             return Pp > 0 && Enabled;
         }
 
-        public virtual double HitChance(sbyte acc, sbyte eva)
+        public virtual double HitChance(Battler user, Battler target)
         {
             if (Accuracy == 0.0)
                 return 1.0;
-            int threshold = Math.Min((int)(Accuracy * 255) * Battler.StageMultipliers[6 + acc] * Battler.StageMultipliers[6 - eva] / 10000, 255);
+            int accnum = Battler.StageMultipliers[6 + user.StatMods.Acc];
+            int evanum = Battler.StageMultipliers[6 - target.StatMods.Eva];
+            int threshold = Math.Min((int)(Accuracy * 255) * accnum * evanum / 10000, 255);
             return threshold / 256.0;
         }
 
@@ -74,7 +76,7 @@ namespace KantoSim
                 ba = user.Identity.Spc;
                 bd = target.Identity.Spc;
             }
-            return new MoveEffect(false, null, GetDamageArray(user.Level, a, d, ba, bd, user.Spe, user.VolatileStatuses.Pumped, user.Types, target.Types));
+            return new MoveEffect(false, GetDamageArray(user.Level, a, d, ba, bd, user.Spe, user.VolatileStatuses.Pumped, user.Types, target.Types));
         }
 
         public abstract MoveEffectPossibility[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes);
@@ -96,7 +98,7 @@ namespace KantoSim
         {
             foreach (Type t in targetTypes)
                 if (Type.EffectivenessAgainst(t) == Type.Effectiveness.Ineffective)
-                    return MoveEffectPossibility.Single(0);
+                    return MoveEffectPossibility.Single(0, 0);
             d /= DefenseDivisor;
             if (a > 255 || d > 255)
             {
@@ -138,7 +140,7 @@ namespace KantoSim
             double critElemChance = critChance / critRandomArray.Length;
             return baseRandomArray.Select(d => (d, baseElemChance))
                 .Concat(critRandomArray.Select(d => (d, critElemChance)))
-                .GroupBy(t => t.d, (d, a) => new MoveEffectPossibility(d, a.Sum(t => t.Item2)))
+                .GroupBy(t => t.d, (d, a) => new MoveEffectPossibility(1, d, a.Sum(t => t.Item2)))
                 .ToArray();
         }
 
@@ -226,7 +228,14 @@ namespace KantoSim
             Stages = stages;
         }
 
-        public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
+        public override double HitChance(Battler user, Battler target)
+        {
+            if (target.VolatileStatuses.Misted)
+                return 0.0;
+            return base.HitChance(user, target);
+        }
+
+        public override MoveEffect Primary(Battler user, Battler target)
         {
             return MoveEffect.Single(OnUser, Affected, Stages);
         }
@@ -263,11 +272,11 @@ namespace KantoSim
 
         public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
         {
-            return new MoveEffect(false, null, new MoveEffectPossibility[] {
-                new MoveEffectPossibility(lastDamage, 0.125),
-                new MoveEffectPossibility(lastDamage * 2, 0.375),
-                new MoveEffectPossibility(lastDamage * 3, 0.375),
-                new MoveEffectPossibility(lastDamage * 4, 0.125)
+            return new MoveEffect(false, new MoveEffectPossibility[] {
+                new MoveEffectPossibility(1, lastDamage, 0.375),
+                new MoveEffectPossibility(2, lastDamage, 0.375),
+                new MoveEffectPossibility(3, lastDamage, 0.125),
+                new MoveEffectPossibility(4, lastDamage, 0.125)
             });
         }
     }
@@ -531,7 +540,7 @@ namespace KantoSim
 
         public override MoveEffectPossibility[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
         {
-            return MoveEffectPossibility.Single(40);
+            return MoveEffectPossibility.Single(1, 40);
         }
     }
 
@@ -610,7 +619,7 @@ namespace KantoSim
 
         public override MoveEffectPossibility[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
         {
-            return MoveEffectPossibility.Single(ushort.MaxValue);
+            return MoveEffectPossibility.Single(1, ushort.MaxValue);
         }
     }
 
@@ -668,7 +677,7 @@ namespace KantoSim
         {
             if (Affected.Duration == 0)
                 return MoveEffect.Single(OnUser, Affected, 1);
-            return new MoveEffect(OnUser, Affected, Enumerable.Range(1, Affected.Duration).Select(r => new MoveEffectPossibility(r, 1.0 / Affected.Duration)).ToArray());
+            return new MoveEffect(OnUser, Enumerable.Range(1, Affected.Duration).Select(r => new MoveEffectPossibility(Affected, r, 1.0 / Affected.Duration)).ToArray());
         }
     }
 
@@ -902,7 +911,7 @@ namespace KantoSim
 
         public override MoveEffectPossibility[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
         {
-            return MoveEffectPossibility.Single(level);
+            return MoveEffectPossibility.Single(1, level);
         }
     }
 
@@ -975,7 +984,7 @@ namespace KantoSim
             if (level <= 1)
                 throw new ArgumentOutOfRangeException("Pokemon of this level cannot use Psywave!", "level");
             int count = level * 3 / 2 - 1;
-            return Enumerable.Range(1, count).Select(d => new MoveEffectPossibility((ushort)d, 1.0 / count)).ToArray();
+            return Enumerable.Range(1, count).Select(d => new MoveEffectPossibility(1, (ushort)d, 1.0 / count)).ToArray();
         }
     }
 
@@ -1069,7 +1078,7 @@ namespace KantoSim
 
         public override MoveEffectPossibility[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
         {
-            return MoveEffectPossibility.Single(level);
+            return MoveEffectPossibility.Single(1, level);
         }
     }
 
@@ -1149,7 +1158,7 @@ namespace KantoSim
 
         public override MoveEffectPossibility[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
         {
-            return MoveEffectPossibility.Single(20);
+            return MoveEffectPossibility.Single(1, 20);
         }
     }
 

@@ -28,6 +28,7 @@ namespace KantoSim
             Flinching,
             FlyingHigh,
             Minimized,
+            Misted,
             Pumped,
             Rampaging,
             Recharging,
@@ -187,6 +188,7 @@ namespace KantoSim
             public bool Flinching { get; private set; }
             public bool FlyingHigh { get; private set; }
             public bool Minimized { get; private set; }
+            public bool Misted { get; private set; }
             public bool Pumped { get; private set; }
             public bool Rampaging { get; private set; }
             public bool Recharging { get; private set; }
