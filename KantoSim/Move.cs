@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace KantoSim
 {
@@ -22,7 +20,8 @@ namespace KantoSim
             Type = type;
             Damages = damages;
             Accuracy = accuracy;
-            Pp = pp;
+            MaxPp = pp;
+            Pp = MaxPp;
             Priority = priority;
             Enabled = true;
         }
@@ -30,6 +29,14 @@ namespace KantoSim
         public bool CanUse()
         {
             return Pp > 0 && Enabled;
+        }
+
+        public virtual double HitChance(sbyte acc, sbyte eva)
+        {
+            if (Accuracy == 0.0)
+                return 1.0;
+            int threshold = Math.Min((int)(Accuracy * 255) * Battler.StageMultipliers[6 + acc] * Battler.StageMultipliers[6 - eva] / 10000, 255);
+            return threshold / 256.0;
         }
 
         public virtual MoveEffect Primary(Battler user, Battler target)
@@ -49,6 +56,26 @@ namespace KantoSim
     {
         public DamagingMove(string name, Type type, double accuracy, byte pp, sbyte priority) : base(name, type, true, accuracy, pp, priority)
         { }
+
+        public override MoveEffect Primary(Battler user, Battler target)
+        {
+            ushort a, d, ba, bd;
+            if (Type.DamageCategory == Category.Physical)
+            {
+                a = user.Atk;
+                d = target.Def;
+                ba = user.Identity.Atk;
+                bd = target.Identity.Def;
+            }
+            else
+            {
+                a = user.Spc;
+                d = target.Spc;
+                ba = user.Identity.Spc;
+                bd = target.Identity.Spc;
+            }
+            return new MoveEffect(false, null, GetDamageArray(user.Level, a, d, ba, bd, user.Spe, user.VolatileStatuses.Pumped, user.Types, target.Types));
+        }
 
         public abstract MoveEffectPossibility[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes);
     }

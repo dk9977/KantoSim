@@ -37,7 +37,7 @@ namespace KantoSim
             Underground
         }
 
-        private class StatModSpread
+        public class StatModSpread
         {
             private const int clear      = 0b100010001000100010001000;
             private const int atkSection = 0b111100000000000000000000;
@@ -175,7 +175,7 @@ namespace KantoSim
             }
         }
 
-        private class VolatileStatusSpread
+        public class VolatileStatusSpread
         {
             public bool BadlyPoisoned { get; private set; }
             public bool Biding { get; private set; }
@@ -203,19 +203,30 @@ namespace KantoSim
             public byte ToxicN { get; private set; }
         }
 
-        private readonly Pokemon _identity;
-        private readonly StatModSpread _statMods;
-        private readonly VolatileStatusSpread _volatileStatuses;
+        public static readonly ushort[] StageMultipliers = new ushort[] { 25, 28, 33, 40, 50, 66, 100, 150, 200, 250, 300, 350, 400 };
+
+        public Pokemon Identity { get; }
+        public StatModSpread StatMods { get; }
+        public VolatileStatusSpread VolatileStatuses { get; }
+        public Type[] Types { get; private set; }
+        public ushort Atk { get => (ushort)(Identity.Atk * StageMultipliers[6 + StatMods.Atk] / 100); }
+        public ushort Def { get => (ushort)(Identity.Def * StageMultipliers[6 + StatMods.Def] / 100); }
+        public ushort Spc { get => (ushort)(Identity.Spc * StageMultipliers[6 + StatMods.Spc] / 100); }
+        public ushort Spe { get => (ushort)(Identity.Spe * StageMultipliers[6 + StatMods.Spe] / 100); }
 
         public Battler(Pokemon identity)
         {
-            _identity = identity;
-            _statMods = new StatModSpread();
+            Identity = identity;
+            StatMods = new StatModSpread();
+            VolatileStatuses = new VolatileStatusSpread();
+            Types = new Type[] { Identity.Type0, Identity.Type1 };
         }
 
-        public bool Damage(ushort hp) => _identity.Damage(hp);
-        public void Heal(ushort hp) => _identity.Heal(hp);
-        public bool ModifyStat(StatMod stat, sbyte stages) => _statMods.ModifyStat(stat, stages);
+        public byte Level => Identity.Level;
+
+        public bool Damage(ushort hp) => Identity.Damage(hp);
+        public void Heal(ushort hp) => Identity.Heal(hp);
+        public bool ModifyStat(StatMod stat, sbyte stages) => StatMods.ModifyStat(stat, stages);
         
     }
 }
