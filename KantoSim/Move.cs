@@ -47,6 +47,8 @@ namespace KantoSim
             return MoveEffect.None;
         }
 
+        public virtual bool TriggersSecondary(bool hit, Battler user, Battler target) => false;
+
         public virtual MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
         {
             return MoveEffect.None;
@@ -158,6 +160,8 @@ namespace KantoSim
         public AbsorbingMove(string name, Type type, byte power, double accuracy, byte pp, sbyte priority) : base(name, type, power, accuracy, pp, priority)
         { }
 
+        public override bool TriggersSecondary(bool hit, Battler user, Battler target) => hit;
+
         public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
         {
             return MoveEffect.Single(true, null, lastDamage / -2);
@@ -197,6 +201,8 @@ namespace KantoSim
             Stages = stages;
             Chance = chance;
         }
+
+        public override bool TriggersSecondary(bool hit, Battler user, Battler target) => hit;
 
         public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
         {
@@ -315,6 +321,8 @@ namespace KantoSim
             Chance = chance;
         }
 
+        public override bool TriggersSecondary(bool hit, Battler user, Battler target) => hit;
+
         public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
         {
             return MoveEffect.SingleChance(false, Affected, 1, Chance);
@@ -340,6 +348,8 @@ namespace KantoSim
             Affected = affected;
             Chance = chance;
         }
+
+        public override bool TriggersSecondary(bool hit, Battler user, Battler target) => hit;
 
         public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
         {
@@ -449,6 +459,8 @@ namespace KantoSim
             return new MoveEffectPossibility[0];
         }
 
+        public override bool TriggersSecondary(bool hit, Battler user, Battler target) => true;
+
         public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
         {
             return MoveEffect.Single(false, null, lastDamage * 2);
@@ -481,17 +493,28 @@ namespace KantoSim
         { }
     }
 
-    public sealed class Dig : RegularDamagingMove
+    public abstract class ChargingMove : RegularDamagingMove
     {
-        public Dig() : base("Dig", Type.Ground, 100, 1.0, 10, 0)
+        public ChargingMove(string name, Type type, byte power, double accuracy, byte pp) : base(name, type, power, accuracy, pp, 0)
         { }
+
+        public virtual MoveEffect OnCharge => MoveEffect.None;
+
+        public override double HitChance(Battler user, Battler target)
+        {
+            if (user.VolatileStatuses.Charging)
+                return base.HitChance(user, target);
+            return 1.0;
+        }
 
         public override MoveEffect Primary(Battler user, Battler target)
         {
             if (user.VolatileStatuses.Charging)
                 return base.Primary(user, target);
-            return MoveEffect.Single(true, Battler.VolatileStatus.Underground, 1);
+            return OnCharge;
         }
+
+        public override bool TriggersSecondary(bool hit, Battler user, Battler target) => true;
 
         public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
         {
@@ -499,6 +522,14 @@ namespace KantoSim
                 return MoveEffect.Single(true, Battler.VolatileStatus.Charging, 0);
             return MoveEffect.Single(true, Battler.VolatileStatus.Charging, 1);
         }
+    }
+
+    public sealed class Dig : ChargingMove
+    {
+        public Dig() : base("Dig", Type.Ground, 100, 1.0, 10)
+        { }
+
+        public override MoveEffect OnCharge => MoveEffect.Single(true, Battler.VolatileStatus.Underground, 1);
     }
 
     public sealed class Disable : StatusMove, IAffectsVolatileStatus
@@ -559,6 +590,8 @@ namespace KantoSim
         {
             RecoilReciprocal = recoilReciprocal;
         }
+
+        public override bool TriggersSecondary(bool hit, Battler user, Battler target) => hit;
 
         public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
         {
@@ -627,6 +660,8 @@ namespace KantoSim
 
         public KamikazeDamagingMove(string name, Type type, byte power, double accuracy, byte pp, sbyte priority) : base(name, type, power, accuracy, pp, priority)
         { }
+
+        public override bool TriggersSecondary(bool hit, Battler user, Battler target) => true;
 
         public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
         {
@@ -718,7 +753,7 @@ namespace KantoSim
             Affected = affected;
         }
 
-        public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Primary(Battler user, Battler target)
         {
             if (Affected.Duration == 0)
                 return MoveEffect.Single(OnUser, Affected, 1);
@@ -776,9 +811,10 @@ namespace KantoSim
         public JumpDamagingMove(string name, byte power, double accuracy, byte pp) : base(name, Type.Fighting, power, accuracy, pp, 0)
         { }
 
+        public override bool TriggersSecondary(bool hit, Battler user, Battler target) => !hit;
+
         public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
         {
-            // triggers on a miss
             return MoveEffect.Single(true, null, 1);
         }
     }
@@ -813,6 +849,8 @@ namespace KantoSim
 
         public RechargeDamagingMove(string name, Type type, byte power, double accuracy, byte pp) : base(name, type, power, accuracy, pp, 0)
         { }
+
+        public override bool TriggersSecondary(bool hit, Battler user, Battler target) => hit;
 
         public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
         {
@@ -1051,20 +1089,33 @@ namespace KantoSim
     // public sealed class RazorWind : RegularDamagingMove
     // { }
 
-    public abstract class HalfHealStatusMove : StatusMove
+    public abstract class HealingStatusMove : StatusMove
     {
-        public HalfHealStatusMove(string name, byte pp) : base(name, Type.Normal, 0.0, pp, 0)
-        { }
+        public readonly byte HealReciprocal;
 
-        public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
+        public HealingStatusMove(string name, byte pp, byte healReciprocal) : base(name, Type.Normal, 0.0, pp, 0)
         {
-            return MoveEffect.Single(true, null, userMaxHp / -2);
+            HealReciprocal = healReciprocal;
+        }
+
+        public override double HitChance(Battler user, Battler target)
+        {
+            int diff = user.Identity.MaxHp - user.Identity.CurrentHp;
+            int b1Diff = diff % 256;
+            if (diff == 0 || b1Diff == 255)
+                return 0.0;
+            return 1.0;
+        }
+
+        public override MoveEffect Primary(Battler user, Battler target)
+        {
+            return MoveEffect.Single(true, null, user.Identity.MaxHp / -HealReciprocal);
         }
     }
 
-    public sealed class Recover : HalfHealStatusMove
+    public sealed class Recover : HealingStatusMove
     {
-        public Recover() : base("Recover", 20)
+        public Recover() : base("Recover", 20, 2)
         { }
     }
 
@@ -1187,9 +1238,9 @@ namespace KantoSim
         { }
     }
 
-    public sealed class SoftBoiled : HalfHealStatusMove
+    public sealed class SoftBoiled : HealingStatusMove
     {
-        public SoftBoiled() : base("Soft-Boiled", 10)
+        public SoftBoiled() : base("Soft-Boiled", 10, 2)
         { }
     }
 
@@ -1356,6 +1407,8 @@ namespace KantoSim
         public Toxic() : base("Toxic", Type.Poison, 0.85, 10, 0, false, NonVolatileStatus.Poison)
         { }
 
+        public override bool TriggersSecondary(bool hit, Battler user, Battler target) => hit;
+
         public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
         {
             return MoveEffect.Single(false, Battler.VolatileStatus.BadlyPoisoned, 1);
@@ -1379,6 +1432,8 @@ namespace KantoSim
         public NonVolatileStatus Affected => NonVolatileStatus.Poison;
 
         public double Chance => 0.2;
+
+        public override bool TriggersSecondary(bool hit, Battler user, Battler target) => hit;
 
         public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
         {
