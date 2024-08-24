@@ -62,7 +62,7 @@ namespace KantoSim
 
         private readonly Species _species;
         private ushort _currentHp;
-        // TODO Status condition field
+        private NonVolatileStatus _status;
         private readonly Move _m1;
         private readonly Move _m2;
         private readonly Move _m3;
@@ -97,6 +97,7 @@ namespace KantoSim
             _spc = (ushort)(((_species.Spc + _ivs.Spc) * 2 + (int)Math.Sqrt(_evs.Spc) / 4) * _level / 100 + 5);
             _spe = (ushort)(((_species.Spe + _ivs.Spe) * 2 + (int)Math.Sqrt(_evs.Spe) / 4) * _level / 100 + 5);
             _currentHp = _maxHp;
+            _status = null;
         }
 
         public ushort CurrentHp
@@ -104,7 +105,11 @@ namespace KantoSim
             get => _currentHp;
             private set => _currentHp = Math.Min(Math.Max((ushort)0, value), _maxHp);
         }
-        // TODO Status condition property
+        public NonVolatileStatus Status
+        {
+            get => _status;
+            private set => _status = value;
+        }
         public Type Type0 { get => _species.Type0; }
         public Type Type1 { get => _species.Type1; }
         public Move M1 { get => _m1; }
@@ -130,6 +135,13 @@ namespace KantoSim
         public void Heal(ushort hp)
         {
             CurrentHp += hp;
+        }
+        public bool SetStatus(NonVolatileStatus status)
+        {
+            if (Status != null)
+                return false;
+            Status = status;
+            return true;
         }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace KantoSim
@@ -414,7 +415,7 @@ namespace KantoSim
             Affected = affected;
         }
 
-        public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Primary(Battler user, Battler target)
         {
             return MoveEffect.Single(OnUser, Affected, 1);
         }
@@ -483,11 +484,25 @@ namespace KantoSim
     // public sealed class Dig : RegularDamagingMove
     // { }
 
-    public sealed class Disable : VolatileStatusStatusMove
+    public sealed class Disable : StatusMove, IAffectsVolatileStatus
     {
-        public Disable() : base("Disable", Type.Normal, 0.55, 20, 0, false, Battler.VolatileStatus.Disabled)
+        public Disable() : base("Disable", Type.Normal, 0.55, 20, 0)
+        { }
+
+        public Battler.VolatileStatus Affected => Battler.VolatileStatus.Disabled;
+
+        public override MoveEffect Primary(Battler user, Battler target)
         {
-            // add Scale for duration of disability
+            // Scale is MoveIndex * 8 + Duration
+            IEnumerable<int> moves = target.Moves
+                .Select((m, i) => (m, i))
+                .Where(t => t.m.CanUse())
+                .Select(t => t.i);
+            double portion = 0.125 / moves.Count();
+            MoveEffectPossibility[] possibilities = Enumerable.Range(0, 8)
+                .SelectMany(d => moves.Select(i => new MoveEffectPossibility(Affected, i * 8 + d, portion)))
+                .ToArray();
+            return new MoveEffect(false, possibilities);
         }
     }
 
@@ -552,6 +567,12 @@ namespace KantoSim
         { }
 
         // target must be asleep
+        public override double HitChance(Battler user, Battler target)
+        {
+            if (target.Status == NonVolatileStatus.Sleep)
+                return 0.0;
+            return base.HitChance(user, target);
+        }
     }
 
     public sealed class DrillPeck : RegularDamagingMove
@@ -1308,8 +1329,16 @@ namespace KantoSim
         { }
     }
 
-    // public sealed class Toxic : StatusMove
-    // { }
+    public sealed class Toxic : NonVolatileStatusStatusMove
+    {
+        public Toxic() : base("Toxic", Type.Poison, 0.85, 10, 0, false, NonVolatileStatus.Poison)
+        { }
+
+        public override MoveEffect Secondary(ushort lastDamage, ushort userMaxHp)
+        {
+            return MoveEffect.Single(false, Battler.VolatileStatus.BadlyPoisoned, 1);
+        }
+    }
 
     // public sealed class Transform : VolatileStatusStatusMove
     // { }

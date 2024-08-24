@@ -211,6 +211,8 @@ namespace KantoSim
         public StatModSpread StatMods { get; }
         public VolatileStatusSpread VolatileStatuses { get; }
         public Type[] Types { get; private set; }
+        public NonVolatileStatus Status => Identity.Status;
+        public Move[] Moves { get => new Move[] { Identity.M1, Identity.M2, Identity.M3, Identity.M4 }; }
         public ushort Atk { get => (ushort)(Identity.Atk * StageMultipliers[6 + StatMods.Atk] / 100); }
         public ushort Def { get => (ushort)(Identity.Def * StageMultipliers[6 + StatMods.Def] / 100); }
         public ushort Spc { get => (ushort)(Identity.Spc * StageMultipliers[6 + StatMods.Spc] / 100); }
@@ -229,6 +231,6 @@ namespace KantoSim
         public bool Damage(ushort hp) => Identity.Damage(hp);
         public void Heal(ushort hp) => Identity.Heal(hp);
         public bool ModifyStat(StatMod stat, sbyte stages) => StatMods.ModifyStat(stat, stages);
-        
+        public bool SetStatus(NonVolatileStatus status) => Identity.SetStatus(status);
     }
 }
