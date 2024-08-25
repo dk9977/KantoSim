@@ -729,7 +729,7 @@ namespace KantoSim
 
     public sealed class Fly : ChargingMove
     {
-        public Fly() : base("Fly", Type.Flying, 100, 1.0, 10)
+        public Fly() : base("Fly", Type.Flying, 70, 0.95, 15)
         { }
 
         public override MoveEffect OnCharge => MoveEffect.Single(true, Battler.VolatileStatus.FlyingHigh, 1);
@@ -1097,8 +1097,11 @@ namespace KantoSim
         { }
     }
 
-    // public sealed class RazorWind : RegularDamagingMove
-    // { }
+    public sealed class RazorWind : ChargingMove
+    {
+        public RazorWind() : base("Razor Wind", Type.Normal, 80, 0.75, 10)
+        { }
+    }
 
     public abstract class HealingStatusMove : StatusMove
     {
