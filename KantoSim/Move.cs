@@ -164,7 +164,7 @@ namespace KantoSim
 
         public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
         {
-            return MoveEffect.Single(true, null, lastDamage / -2);
+            return MoveEffect.Single(true, null, lastDamage / 2);
         }
     }
 
@@ -1123,7 +1123,7 @@ namespace KantoSim
 
         public override MoveEffect Primary(Battler user, Battler target)
         {
-            return MoveEffect.Single(true, null, user.Identity.MaxHp / -HealReciprocal);
+            return MoveEffect.Single(true, null, user.Identity.MaxHp / HealReciprocal);
         }
     }
 
