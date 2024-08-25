@@ -1136,8 +1136,18 @@ namespace KantoSim
     // public sealed class Reflect : StatusMove
     // { }
 
-    // public sealed class Rest : StatusMove
-    // { }
+    public sealed class Rest : HealingStatusMove
+    {
+        public Rest() : base("Rest", 10, 1)
+        { }
+
+        public override bool TriggersSecondary(bool hit, Battler user, Battler target) => true;
+
+        public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
+        {
+            return MoveEffect.Single(true, NonVolatileStatus.Sleep, 2);
+        }
+    }
 
     public sealed class Roar : StatusMove
     {
@@ -1210,12 +1220,18 @@ namespace KantoSim
         { }
     }
 
-    // public sealed class SkullBash : RegularDamagingMove
-    // { }
+    public sealed class SkullBash : ChargingMove
+    {
+        public SkullBash() : base("Skull Bash", Type.Normal, 100, 1.0, 15)
+        { }
+    }
 
-    // public sealed class SkyAttack : RegularDamagingMove
-    // { }
-
+    public sealed class SkyAttack : ChargingMove
+    {
+        public SkyAttack() : base("Sky Attack", Type.Flying, 140, 90, 5)
+        { }
+    }
+    
     public sealed class Slam : RegularDamagingMove
     {
         public Slam() : base("Slam", Type.Normal, 80, 0.75, 20, 0)
@@ -1258,8 +1274,11 @@ namespace KantoSim
         { }
     }
 
-    // public sealed class SolarBeam : RegularDamagingMove
-    // { }
+    public sealed class SolarBeam : ChargingMove
+    {
+        public SolarBeam() : base("Solar Beam", Type.Grass, 120, 1.0, 10)
+        { }
+    }
 
     public sealed class SonicBoom : DamagingMove
     {
