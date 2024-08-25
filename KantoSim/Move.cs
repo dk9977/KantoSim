@@ -49,7 +49,7 @@ namespace KantoSim
 
         public virtual bool TriggersSecondary(bool hit, Battler user, Battler target) => false;
 
-        public virtual MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
+        public virtual MoveEffect Secondary(Battler user, Battler target, ushort lastDamage)
         {
             return MoveEffect.None;
         }
@@ -162,7 +162,7 @@ namespace KantoSim
 
         public override bool TriggersSecondary(bool hit, Battler user, Battler target) => hit;
 
-        public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(Battler user, Battler target, ushort lastDamage)
         {
             return MoveEffect.Single(true, null, lastDamage / 2);
         }
@@ -204,7 +204,7 @@ namespace KantoSim
 
         public override bool TriggersSecondary(bool hit, Battler user, Battler target) => hit;
 
-        public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(Battler user, Battler target, ushort lastDamage)
         {
             return MoveEffect.SingleChance(false, Affected, Stages, Chance);
         }
@@ -323,7 +323,7 @@ namespace KantoSim
 
         public override bool TriggersSecondary(bool hit, Battler user, Battler target) => hit;
 
-        public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(Battler user, Battler target, ushort lastDamage)
         {
             return MoveEffect.SingleChance(false, Affected, 1, Chance);
         }
@@ -351,7 +351,7 @@ namespace KantoSim
 
         public override bool TriggersSecondary(bool hit, Battler user, Battler target) => hit;
 
-        public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(Battler user, Battler target, ushort lastDamage)
         {
             return MoveEffect.SingleChance(false, Affected, 1, Chance);
         }
@@ -461,7 +461,7 @@ namespace KantoSim
 
         public override bool TriggersSecondary(bool hit, Battler user, Battler target) => true;
 
-        public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(Battler user, Battler target, ushort lastDamage)
         {
             return MoveEffect.Single(false, null, lastDamage * 2);
         }
@@ -516,7 +516,7 @@ namespace KantoSim
 
         public override bool TriggersSecondary(bool hit, Battler user, Battler target) => true;
 
-        public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(Battler user, Battler target, ushort lastDamage)
         {
             if (user.VolatileStatuses.Charging)
                 return MoveEffect.Single(true, Battler.VolatileStatus.Charging, 0);
@@ -593,7 +593,7 @@ namespace KantoSim
 
         public override bool TriggersSecondary(bool hit, Battler user, Battler target) => hit;
 
-        public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(Battler user, Battler target, ushort lastDamage)
         {
             return MoveEffect.Single(true, null, lastDamage / RecoilReciprocal);
         }
@@ -663,9 +663,9 @@ namespace KantoSim
 
         public override bool TriggersSecondary(bool hit, Battler user, Battler target) => true;
 
-        public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(Battler user, Battler target, ushort lastDamage)
         {
-            return MoveEffect.Single(true, null, userMaxHp);
+            return MoveEffect.Single(true, null, user.Identity.MaxHp);
         }
     }
 
@@ -824,7 +824,7 @@ namespace KantoSim
 
         public override bool TriggersSecondary(bool hit, Battler user, Battler target) => !hit;
 
-        public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(Battler user, Battler target, ushort lastDamage)
         {
             return MoveEffect.Single(true, null, 1);
         }
@@ -863,7 +863,7 @@ namespace KantoSim
 
         public override bool TriggersSecondary(bool hit, Battler user, Battler target) => hit;
 
-        public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(Battler user, Battler target, ushort lastDamage)
         {
             return MoveEffect.Single(true, Affected, 1);
         }
@@ -1143,7 +1143,7 @@ namespace KantoSim
 
         public override bool TriggersSecondary(bool hit, Battler user, Battler target) => true;
 
-        public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(Battler user, Battler target, ushort lastDamage)
         {
             return MoveEffect.Single(true, NonVolatileStatus.Sleep, 2);
         }
@@ -1348,11 +1348,24 @@ namespace KantoSim
     // public sealed class Substitute : StatusMove
     // { }
 
-    // public sealed class SuperFang : DamagingMove
-    // {
-    //     public SuperFang() : base("Super Fang", Type.Normal, 0.9, 10, 0)
-    //     { }
-    // }
+    public sealed class SuperFang : DamagingMove
+    {
+        public SuperFang() : base("Super Fang", Type.Normal, 0.9, 10, 0)
+        { }
+
+        public override MoveEffectPossibility[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
+        {
+            return new MoveEffectPossibility[0];
+        }
+
+        public override bool TriggersSecondary(bool hit, Battler user, Battler target) => true;
+
+        public override MoveEffect Secondary(Battler user, Battler target, ushort lastDamage)
+        {
+            int damage = Math.Max(target.Identity.CurrentHp / 2, 1);
+            return MoveEffect.Single(false, 1, damage);
+        }
+    }
 
     public sealed class Supersonic : VolatileStatusStatusMove
     {
@@ -1442,7 +1455,7 @@ namespace KantoSim
 
         public override bool TriggersSecondary(bool hit, Battler user, Battler target) => hit;
 
-        public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(Battler user, Battler target, ushort lastDamage)
         {
             return MoveEffect.Single(false, Battler.VolatileStatus.BadlyPoisoned, 1);
         }
@@ -1468,7 +1481,7 @@ namespace KantoSim
 
         public override bool TriggersSecondary(bool hit, Battler user, Battler target) => hit;
 
-        public override MoveEffect Secondary(Battler user, ushort lastDamage, ushort userMaxHp)
+        public override MoveEffect Secondary(Battler user, Battler target, ushort lastDamage)
         {
             return MoveEffect.SingleChance(false, Affected, 1, Chance);
         }
