@@ -696,6 +696,12 @@ namespace KantoSim
         { }
 
         // fails if user is slower than target
+        public override double HitChance(Battler user, Battler target)
+        {
+            if (user.Spe < target.Spe)
+                return 0.0;
+            return base.HitChance(user, target);
+        }
 
         public override MoveEffectPossibility[] GetDamageArray(byte level, ushort a, ushort d, ushort ba, ushort bd, ushort bs, bool fe, Type[] userTypes, Type[] targetTypes)
         {
