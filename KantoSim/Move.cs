@@ -727,8 +727,13 @@ namespace KantoSim
         { }
     }
 
-    // public sealed class Fly : RegularDamagingMove
-    // { }
+    public sealed class Fly : ChargingMove
+    {
+        public Fly() : base("Fly", Type.Flying, 100, 1.0, 10)
+        { }
+
+        public override MoveEffect OnCharge => MoveEffect.Single(true, Battler.VolatileStatus.FlyingHigh, 1);
+    }
 
     public sealed class FocusEnergy : VolatileStatusStatusMove
     {
