@@ -467,7 +467,7 @@ namespace KantoSim
             return new MoveEffectPossibility[0];
         }
 
-        public override bool TriggersSecondary(bool hit, Battler user, Battler target) => true;
+        public override bool TriggersSecondary(bool hit, Battler user, Battler target) => hit;
 
         public override MoveEffect Secondary(Battler user, Battler target, ushort lastDamage)
         {
