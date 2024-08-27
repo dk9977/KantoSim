@@ -446,8 +446,16 @@ namespace KantoSim
     // public sealed class Constrict : DamagingMove
     // { }
 
-    //public sealed class Conversion : StatusMove
-    // { }
+    public sealed class Conversion : StatusMove
+    {
+        public Conversion() : base("Conversion", Type.Normal, 0.0, 10, 0)
+        { }
+
+        public override MoveEffect Primary(Battler user, Battler target)
+        {
+            return MoveEffect.Single(true, target.Types, 1);
+        }
+    }
 
     public sealed class Counter : DamagingMove
     {
